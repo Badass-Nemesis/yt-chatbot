@@ -1,14 +1,13 @@
 import express from 'express';
-import authRoutes from './routes/auth';
-import youtubeRoutes from './routes/youtube';
+import bodyParser from 'body-parser';
+import { startLiveChatTask } from './tasks/liveChatTask';
 
 const app = express();
 
-// Middleware to parse JSON requests
-app.use(express.json());
+// Middleware
+app.use(bodyParser.json());
 
-// Routes
-app.use(authRoutes);
-app.use(youtubeRoutes);
+// Start live chat task
+startLiveChatTask();
 
 export default app;
