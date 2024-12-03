@@ -1,0 +1,26 @@
+{
+  "name": "yt-chatbot",
+  "version": "1.0.0",
+  "main": "src/server.ts",
+  "scripts": {
+    "nodemon": "nodemon tsc-node-dev src/server.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "google-auth-library": "^9.15.0",
+    "googleapis": "^144.0.0",
+    "nodemon": "^3.1.7"
+  }
+}
