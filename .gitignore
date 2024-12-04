@@ -1,6 +1,4 @@
 node_modules
 .env
-credentials
-tokens.json
-service-account-key.json
-serviceAccounts
+service-account.json
+writeToken.json

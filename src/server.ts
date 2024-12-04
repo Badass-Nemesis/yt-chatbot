@@ -1,33 +1,21 @@
-require('dotenv').config();
-import express from 'express';
-import logger from './utils/logger';
-import { authenticate } from './auth/authService';
+import app from './app';
 import { startLiveChatTask } from './tasks/liveChatTask';
+import { setupWriteAuth } from './auth/writeAuthService';
 
 const PORT = process.env.PORT || 3000;
 
-const startServer = () => {
-    const app = express();
+const startServer = async () => {
+    app.listen(PORT, async () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
 
-    app.listen(PORT, () => {
-        logger.info(`Server is running on port ${PORT}`);
-        console.log(`Server is running on port ${PORT}`);
-    });
-
-    startLiveChatTask();
-};
-
-const initializeApp = async () => {
-    try {
-        const oauth2Client = await authenticate();
-        if (oauth2Client.credentials.access_token) {
-            startServer();
-        } else {
-            console.error('Authentication failed: No access token found.');
+        try {
+            // Setup write authentication and start live chat task
+            await setupWriteAuth();
+            await startLiveChatTask();
+        } catch (error) {
+            console.error('Error starting the server:', error);
         }
-    } catch (error) {
-        console.error('Failed to authenticate:', error);
-    }
+    });
 };
 
-initializeApp();
+startServer();

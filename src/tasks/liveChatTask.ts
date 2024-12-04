@@ -1,94 +1,123 @@
-import { config } from 'dotenv';
-import { fetchLiveChatMessages, getLiveChatId } from '../services/youtube/readLiveMessages';
-import { sendMessageToLiveChat } from '../services/youtube/sendReplies';
+import { fetchLiveChatMessages } from '../services/readLiveMessages';
+import { sendMessageToLiveChat } from '../services/sendReplies';
+import { getLiveChatId } from '../services/getLiveChatId';
+import { getWriteOAuth2Client } from '../auth/writeAuthService';
 import { delay } from '../utils/delay';
+import { CircularBuffer } from '../utils/messageCache';
+import { getGeminiReply } from '../services/geminiService';
 
-config(); // Load environment variables from .env
+// Buffer to hold the last 100 messages
+const messageCache = new CircularBuffer<string>(100);
 
-const liveUrl = process.env.YOUTUBE_LIVE_URL; // Get the live URL from environment variables
+const liveUrl = process.env.YOUTUBE_LIVE_URL;
+const botUserId = process.env.BOT_USER_ID; // Add your bot's user/channel ID here
 let liveChatId: string | null = null;
+let isFirstRun = true;
 
 if (!liveUrl) {
     throw new Error('YOUTUBE_LIVE_URL is not defined in the environment variables.');
 }
 
-const checkLiveChatMessages = async () => {
-    // Get and store live chat ID once
-    if (!liveChatId) {
-        liveChatId = await getLiveChatId(liveUrl);
-        if (!liveChatId) {
-            console.log('No live chat found. Retrying...');
-            await delay(3600000); // Wait for 1 hour before retrying
-            return;
-        }
+// Function to check token validity
+const isTokenValid = async (): Promise<boolean> => {
+    try {
+        const authClient = await getWriteOAuth2Client();
+        const tokenInfo = await authClient.getAccessToken();
+        console.log('Token is valid');
+        return tokenInfo.token !== null;
+    } catch (error) {
+        console.error('Token validation error:', error);
+        return false;
     }
+};
 
+// Function to process live chat messages
+const processMessages = async () => {
     while (true) {
         try {
-            const messages = await fetchLiveChatMessages(liveChatId);
+            console.log('Fetching live chat messages...');
+            const messages = await fetchLiveChatMessages(liveChatId!);
 
             if (!messages || messages.length === 0) {
                 console.log('No messages found. Retrying...');
-                await delay(15000); // Wait for 15 seconds before retrying
+                await delay(30000); // Wait for 30 seconds before retrying
                 continue;
             }
 
-            // Check if there's any message from the bot and remove them from the main messages list
-            const botMessages = messages.filter(
-                (msg: any) => msg.authorDetails && msg.authorDetails.channelId === process.env.BOT_USER_CHANNEL_ID
-            );
+            for (const message of messages) {
+                if (message.snippet && message.snippet.textMessageDetails) {
+                    const text = message.snippet.textMessageDetails.messageText;
+                    const authorChannelId = message.authorDetails?.channelId;
 
-            const nonBotMessages = messages.filter(
-                (msg: any) => msg.authorDetails && msg.authorDetails.channelId !== process.env.BOT_USER_CHANNEL_ID
-            );
+                    // Skip messages sent by the bot itself
+                    if (authorChannelId === botUserId) {
+                        // console.log('Skipping bot\'s own message'); // debug
+                        continue;
+                    }
 
-            let newMessages = nonBotMessages;
+                    // Store messages in the cache without replying on the first run
+                    if (isFirstRun) {
+                        // console.log('Caching initial message without reply'); // debug
+                        if (text && !messageCache.contains(text)) {
+                            messageCache.add(text);
+                        }
+                    } else {
+                        // Process and reply to new messages
+                        if (text && !messageCache.contains(text)) {
+                            messageCache.add(text);
 
-            if (botMessages.length > 0) {
-                const latestBotMessage = botMessages[0]; // Latest bot message is at the top after sorting
-                if (latestBotMessage.snippet && latestBotMessage.snippet.publishedAt) {
-                    const latestBotMessageDate = new Date(latestBotMessage.snippet.publishedAt);
-                    newMessages = nonBotMessages.filter(
-                        (msg: any) =>
-                            msg.snippet &&
-                            msg.snippet.publishedAt &&
-                            new Date(msg.snippet.publishedAt) > latestBotMessageDate
-                    );
+                            const authorName = message.authorDetails?.displayName;
+                            if (authorName) {
+                                console.log(`Generating reply for @${authorName}`); // debug
+                                const reply = await getGeminiReply(authorName, text);
+                                // console.log(`Sending reply: ${reply}`); // debug
+                                await sendMessageToLiveChat(liveChatId!, reply);
+                                console.log(`Replied to ${authorName} with "${reply}"`); // debug
+                            } else {
+                                console.log('Author name is not available. Skipping...');
+                            }
+                        }
+                    }
                 }
             }
 
-            if (newMessages.length === 0) {
-                console.log('No new other messages found. Retrying...');
-                await delay(15000); // Wait for 15 seconds before retrying
-                continue;
+            // Set isFirstRun to false after the first run
+            if (isFirstRun) {
+                isFirstRun = false;
+                console.log('Completed first run, future messages will receive replies');
             }
 
-            // Limit the number of replies to a manageable number
-            const replyMessages = newMessages.slice(0, 3); // Adjust the number of replies as needed
-
-            for (const selectedMessage of replyMessages) {
-                const authorDetails = selectedMessage.authorDetails;
-                const authorName = authorDetails?.displayName;
-
-                if (authorName) {
-                    await sendMessageToLiveChat(liveChatId, `@${authorName} Hello World!`);
-                    console.log(`Replied to ${authorName} with "Hello World!"`);
-                } else {
-                    console.log('Author name is not available. Skipping...');
-                }
-
-                await delay(15000); // Wait for 15 seconds before checking again
-            }
+            console.log('Waiting for 30 seconds before checking again...');
+            await delay(30000); // Wait for 30 seconds before checking again
         } catch (error) {
             console.error('Error in live chat task:', error);
+            console.log('Waiting for 1 minute before retrying...');
             await delay(60000); // Wait for 1 minute before retrying in case of error
         }
     }
 };
 
-const startLiveChatTask = () => {
+// Start live chat task
+export const startLiveChatTask = async () => {
     console.log('Starting live chat task...');
-    checkLiveChatMessages();
-};
 
-startLiveChatTask();
+    // Check if the token is valid
+    const tokenValid = await isTokenValid();
+    if (!tokenValid) {
+        console.log('Invalid or missing token. Please obtain a valid token.');
+        return;
+    }
+
+    // Get the live chat ID
+    console.log('Retrieving live chat ID...');
+    liveChatId = await getLiveChatId(liveUrl);
+    if (!liveChatId) {
+        console.log('No live chat found. Retrying...');
+        await delay(60000); // Wait for 1 minute before retrying
+        return;
+    }
+
+    console.log('Live chat ID retrieved, starting message processing...');
+    // Start processing messages
+    await processMessages();
+};

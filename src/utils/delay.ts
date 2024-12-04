@@ -1,2 +1,4 @@
-// Function to introduce a delay in execution
-export const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Function to delay execution for a specified number of milliseconds
+export const delay = (ms: number): Promise<void> => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+};

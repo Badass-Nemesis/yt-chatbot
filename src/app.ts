@@ -1,13 +1,15 @@
 import express from 'express';
 import bodyParser from 'body-parser';
-import { startLiveChatTask } from './tasks/liveChatTask';
 
 const app = express();
 
 // Middleware
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Start live chat task
-startLiveChatTask();
+// Simple route for testing
+app.get('/', (req, res) => {
+    res.send('Hello World!');
+});
 
 export default app;
