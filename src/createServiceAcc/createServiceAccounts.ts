@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Path to your service account key file
-const keyFilePath = './src/createServiceAcc/service-account-key.json';
+const keyFilePath = path.join(__dirname, 'service-account-key.json');
 
 const projectId = 'youtube-live-chat-chatbot';
 const serviceAccountCount = 10;
@@ -60,8 +60,8 @@ const createServiceAccounts = async () => {
                     const keyData = keyResponse.data.privateKeyData;
                     if (keyData) {
                         const keyBuffer = Buffer.from(keyData, 'base64');
-                        const keyFileName = `${serviceAccountName}-key.json`;
-                        fs.writeFileSync(path.join(__dirname, keyFileName), keyBuffer);
+                        const keyFileName = path.join(__dirname, 'serviceAccounts', `${serviceAccountName}-key.json`);
+                        fs.writeFileSync(keyFileName, keyBuffer);
                         console.log(`Saved key for ${serviceAccountName} to ${keyFileName}`);
                         keyCreated = true;
                     } else {

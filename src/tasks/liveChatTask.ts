@@ -1,6 +1,9 @@
-import { fetchLiveChatMessages, sendMessageToLiveChat, getLiveChatId } from '../services/youtubeService';
+import { config } from 'dotenv';
+import { fetchLiveChatMessages, getLiveChatId } from '../services/youtube/readLiveMessages';
+import { sendMessageToLiveChat } from '../services/youtube/sendReplies';
+import { delay } from '../utils/delay';
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+config(); // Load environment variables from .env
 
 const liveUrl = process.env.YOUTUBE_LIVE_URL; // Get the live URL from environment variables
 let liveChatId: string | null = null;
@@ -30,12 +33,6 @@ const checkLiveChatMessages = async () => {
                 continue;
             }
 
-            // Log all fetched messages for debugging
-            // debug
-            // messages.forEach(msg => {
-            //     console.log(`Fetched Message - ID: ${msg.id}, Published At: ${msg.snippet?.publishedAt}, Author: ${msg.authorDetails?.displayName}`);
-            // });
-
             // Check if there's any message from the bot and remove them from the main messages list
             const botMessages = messages.filter(
                 (msg: any) => msg.authorDetails && msg.authorDetails.channelId === process.env.BOT_USER_CHANNEL_ID
@@ -44,12 +41,6 @@ const checkLiveChatMessages = async () => {
             const nonBotMessages = messages.filter(
                 (msg: any) => msg.authorDetails && msg.authorDetails.channelId !== process.env.BOT_USER_CHANNEL_ID
             );
-
-            // Log all bot messages for debugging
-            // debug
-            // botMessages.forEach(msg => {
-            //     console.log(`Bot Message - ID: ${msg.id}, Published At: ${msg.snippet?.publishedAt}, Author: ${msg.authorDetails?.displayName}`);
-            // });
 
             let newMessages = nonBotMessages;
 
@@ -63,12 +54,6 @@ const checkLiveChatMessages = async () => {
                             msg.snippet.publishedAt &&
                             new Date(msg.snippet.publishedAt) > latestBotMessageDate
                     );
-
-                    // Log filtered new messages for debugging
-                    // debug
-                    newMessages.forEach(msg => {
-                        console.log(`New Message After Bot - ID: ${msg.id}, Published At: ${msg.snippet?.publishedAt}, Author: ${msg.authorDetails?.displayName}`);
-                    });
                 }
             }
 
@@ -106,4 +91,4 @@ const startLiveChatTask = () => {
     checkLiveChatMessages();
 };
 
-export { startLiveChatTask };
+startLiveChatTask();

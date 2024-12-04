@@ -1,7 +1,7 @@
 require('dotenv').config();
 import express from 'express';
 import logger from './utils/logger';
-import { authenticate } from './services/authService';
+import { authenticate } from './auth/authService';
 import { startLiveChatTask } from './tasks/liveChatTask';
 
 const PORT = process.env.PORT || 3000;
