@@ -44,9 +44,13 @@ const processMessages = async () => {
                 continue;
             }
 
+            let priorityMessages = [];
+            let otherMessages = [];
+            let newMessages = [];
+
             for (const message of messages) {
                 if (message.snippet && message.snippet.textMessageDetails) {
-                    const text = message.snippet.textMessageDetails.messageText;
+                    const text = message.snippet.textMessageDetails?.messageText;
                     const authorChannelId = message.authorDetails?.channelId;
 
                     // Skip messages sent by the bot itself
@@ -55,43 +59,82 @@ const processMessages = async () => {
                         continue;
                     }
 
-                    // Store messages in the cache without replying on the first run
-                    if (isFirstRun) {
-                        // console.log('Caching initial message without reply'); // debug
-                        if (text && !messageCache.contains(text)) {
-                            messageCache.add(text);
-                        }
-                    } else {
-                        // Process and reply to new messages
-                        if (text && !messageCache.contains(text)) {
-                            messageCache.add(text);
-
-                            const authorName = message.authorDetails?.displayName;
-                            if (authorName) {
-                                console.log(`Generating reply for @${authorName}`); // debug
-                                const reply = await getGeminiReply(authorName, text);
-                                // console.log(`Sending reply: ${reply}`); // debug
-                                await sendMessageToLiveChat(liveChatId!, reply);
-                                console.log(`Replied to ${authorName} with "${reply}"`); // debug
-                            } else {
-                                console.log('Author name is not available. Skipping...');
-                            }
+                    // Collect new messages
+                    if (text && !messageCache.contains(text)) {
+                        newMessages.push(message);
+                        if (/Matthew Shields|Matthew|Shields/i.test(text)) {
+                            priorityMessages.push(message);
+                        } else {
+                            otherMessages.push(message);
                         }
                     }
                 }
             }
 
+            // Limit the number of replies to 2
+            let repliesRemaining = 2;
+
+            // Process priority messages first
+            for (const message of priorityMessages) {
+                if (repliesRemaining > 0) {
+                    const text = message.snippet?.textMessageDetails?.messageText;
+                    const authorName = message.authorDetails?.displayName;
+                    if (text) {
+                        messageCache.add(text);
+                        if (authorName) {
+                            console.log(`Generating reply for @${authorName}`); // debug
+                            const reply = await getGeminiReply(authorName, text);
+                            // console.log(`Sending reply: ${reply}`); // debug
+                            await sendMessageToLiveChat(liveChatId!, reply);
+                            console.log(`Replied to ${authorName} with "${reply}"`); // debug
+                            repliesRemaining--;
+                        } else {
+                            console.log('Author name is not available. Skipping...');
+                        }
+                    }
+                }
+            }
+
+            // Process up to 1 random new message if there's remaining quota
+            if (repliesRemaining > 0 && otherMessages.length > 0) {
+                otherMessages = otherMessages.sort(() => 0.5 - Math.random()).slice(0, 1);
+                for (const message of otherMessages) {
+                    const text = message.snippet?.textMessageDetails?.messageText;
+                    const authorName = message.authorDetails?.displayName;
+                    if (text) {
+                        messageCache.add(text);
+                        if (authorName) {
+                            console.log(`Generating reply for @${authorName}`); // debug
+                            const reply = await getGeminiReply(authorName, text);
+                            // console.log(`Sending reply: ${reply}`); // debug
+                            await sendMessageToLiveChat(liveChatId!, reply);
+                            console.log(`Replied to ${authorName} with "${reply}"`); // debug
+                        } else {
+                            console.log('Author name is not available. Skipping...');
+                        }
+                    }
+                }
+            }
+
+            // Store remaining new messages in the cache
+            newMessages.forEach(message => {
+                const text = message.snippet?.textMessageDetails?.messageText;
+                if (text && !messageCache.contains(text)) {
+                    messageCache.add(text);
+                }
+            });
+
             // Set isFirstRun to false after the first run
             if (isFirstRun) {
                 isFirstRun = false;
-                console.log('Completed first run, future messages will receive replies');
+                console.log('Completed first run, future messages will receive replies'); // debug
             }
 
-            console.log('Waiting for 30 seconds before checking again...');
-            await delay(30000); // Wait for 30 seconds before checking again
+            console.log('Waiting for 1 minute before checking again...'); // debug
+            await delay(60000); // Wait for 1 minute before checking again
         } catch (error) {
-            console.error('Error in live chat task:', error);
-            console.log('Waiting for 1 minute before retrying...');
+            console.error('Error in live chat task:', error); 
+            console.log('Waiting for 1 minute before retrying...'); // debug
             await delay(60000); // Wait for 1 minute before retrying in case of error
         }
     }
