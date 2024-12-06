@@ -6,6 +6,7 @@ import { delay } from '../utils/delay';
 import { CircularBuffer } from '../utils/messageCache';
 import { getGeminiReply } from '../services/geminiService';
 import { youtube_v3 } from 'googleapis';
+import { getReply } from '../services/ollamaService';
 
 // cache to hold the latest 100 messages
 const messageCache = new CircularBuffer<string>(100);
@@ -13,7 +14,7 @@ const messageCache = new CircularBuffer<string>(100);
 const liveUrl = process.env.YOUTUBE_LIVE_URL;
 let botUserId = process.env.BOT_USER_ID;
 let liveChatId: string | null = null;
-// let isFirstRun = true;
+let isFirstRun = true;
 
 if (!liveUrl) {
     throw new Error('YOUTUBE_LIVE_URL is not defined in the environment variables.');
@@ -43,7 +44,7 @@ const processSingleMessage = async (message: youtube_v3.Schema$LiveChatMessage, 
     if (text) {
         messageCache.add(text);
         if (authorName) {
-            const reply = await getGeminiReply(authorName, text);
+            const reply = await getReply(authorName, text);
             return { reply, authorName, repliesRemaining: repliesRemaining - 1 };
         } else {
             console.log('Author name is not available. Skipping...');
@@ -101,11 +102,11 @@ const processMessages = async () => {
             const { priorityMessages, otherMessages } = categorizeMessages(messages, botUserId);
 
             // skipping all the messages if the server has just started
-            // if (isFirstRun) {
-            //     isFirstRun = false; 
-            //     console.log('Completed first run, future messages will receive replies');
-            //     continue; // skipping all things below
-            // }
+            if (isFirstRun) {
+                isFirstRun = false; 
+                console.log('Completed first run, future messages will receive replies');
+                continue; // skipping all things below
+            }
 
             let repliesRemaining = 2;
             let replies = [];
@@ -138,7 +139,7 @@ const processMessages = async () => {
             }
 
             console.log('Waiting for 45 seconds before checking again...');
-            await delay(45000); // waiting for 45 seconds before checking live chat messages
+            await delay(10000); // waiting for 45 seconds before checking live chat messages
         } catch (error) {
             console.error('Error in live chat task:', error);
             console.log('Waiting for 1 minute before retrying...');
@@ -166,7 +167,7 @@ export const startLiveChatTask = async () => {
         return;
     }
 
-    console.log("Live chat id is: " + liveChatId);
+    // console.log("Live chat id is: " + liveChatId); // debug
     console.log('Live chat ID retrieved, starting processing live chat messages...');
     await processMessages();
 };
