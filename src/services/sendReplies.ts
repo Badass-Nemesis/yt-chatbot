@@ -1,8 +1,7 @@
-import { google, youtube_v3 } from 'googleapis';
+import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { getWriteOAuth2Client } from '../auth/writeAuthService';
 
-// Function to send a message to the live chat
 export const sendMessageToLiveChat = async (liveChatId: string, message: string): Promise<void> => {
     const authClient: OAuth2Client = await getWriteOAuth2Client();
     const youtube = google.youtube({ version: 'v3', auth: authClient });

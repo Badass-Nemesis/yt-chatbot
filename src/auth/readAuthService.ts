@@ -1,20 +1,34 @@
-import { google } from 'googleapis';
+import { getValidOAuth2Client } from '../utils/serviceAccountManager';
 import { OAuth2Client } from 'google-auth-library';
-import { config } from 'dotenv';
-import * as path from 'path';
 
-config(); // Load environment variables from .env
-
-// Function to get OAuth2 client for reading
 export const getReadOAuth2Client = async (): Promise<OAuth2Client> => {
-    const keyFilePath = path.resolve(__dirname, '../service-account.json'); 
+    try {
+        const authClient = await getValidOAuth2Client();
+        if (authClient) {
+            console.log("Read OAuth2 client retrieved successfully.");
+            return authClient;
+        } else {
+            console.error("No valid service accounts found.");
+            throw new Error("No valid service accounts found.");
+        }
+    } catch (error) {
+        console.error("Error getting OAuth2 client:", error);
+        throw error;
+    }
+};
 
-    const auth = new google.auth.GoogleAuth({
-        keyFile: keyFilePath,
-        scopes: ['https://www.googleapis.com/auth/youtube.force-ssl'],
-    });
-
-    const authClient = await auth.getClient() as OAuth2Client;
-
-    return authClient;
+// this function is only for server.ts to use
+export const setupReadAuth = async (): Promise<OAuth2Client | null> => {
+    try {
+        const authClient = await getValidOAuth2Client();
+        if (authClient) {
+            console.log("Read OAuth2 client setup successfully.");
+        } else {
+            console.error("No valid service accounts found.");
+        }
+        return authClient;
+    } catch (error) {
+        console.error("Error setting up read OAuth2 client:", error);
+        return null;
+    }
 };

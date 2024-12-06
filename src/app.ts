@@ -1,13 +1,11 @@
 import express from 'express';
-import bodyParser from 'body-parser';
 
 const app = express();
 
-// Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Simple route for testing
+// this is just for checking if the server is running or not
 app.get('/', (req, res) => {
     res.send('Hello World!');
 });

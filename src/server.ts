@@ -1,15 +1,18 @@
+require('dotenv').config();
 import app from './app';
 import { startLiveChatTask } from './tasks/liveChatTask';
 import { setupWriteAuth } from './auth/writeAuthService';
+import { setupReadAuth } from './auth/readAuthService';
 
 const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
     app.listen(PORT, async () => {
-        console.log(`Server is running on http://localhost:${PORT}`);
+        console.log(`Server is running on PORT: ${PORT}`);
 
         try {
-            // Setup write authentication and start live chat task
+            // dont change the sequence
+            await setupReadAuth();
             await setupWriteAuth();
             await startLiveChatTask();
         } catch (error) {

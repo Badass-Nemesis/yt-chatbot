@@ -3,7 +3,7 @@ import { getReadOAuth2Client } from '../auth/readAuthService';
 import { GaxiosResponse } from 'gaxios';
 import { delay } from '../utils/delay';
 
-// Function to initialize YouTube client
+// basically giving a jolt to the service account to wake up
 const initializeYouTubeClient = async (): Promise<youtube_v3.Youtube> => {
     const authClient = await getReadOAuth2Client();
 
@@ -15,19 +15,20 @@ const initializeYouTubeClient = async (): Promise<youtube_v3.Youtube> => {
     return youtube;
 };
 
-// Function to fetch live chat messages using the service account
+// this is the part of project where I don't understand what types/interface I've used to make TS happy
 export const fetchLiveChatMessages = async (liveChatId: string): Promise<youtube_v3.Schema$LiveChatMessage[]> => {
-    const youtube = await initializeYouTubeClient();
+    let youtube = await initializeYouTubeClient();
 
     let allMessages: youtube_v3.Schema$LiveChatMessage[] = [];
     let nextPageToken: string | undefined = undefined;
-    const delayBetweenPages = 5000; // 5 seconds delay between each page fetch
+    const delayBetweenPages = 5000; // 5 seconds delay
 
+    // hey, I remember you do/while
     do {
         try {
             console.log('Requesting live chat messages...');
             const response: GaxiosResponse<youtube_v3.Schema$LiveChatMessageListResponse> = await youtube.liveChatMessages.list({
-                liveChatId: liveChatId,
+                liveChatId,
                 part: ['snippet', 'authorDetails'],
                 pageToken: nextPageToken,
             });
@@ -37,6 +38,7 @@ export const fetchLiveChatMessages = async (liveChatId: string): Promise<youtube
             const totalResults = response.data.pageInfo?.totalResults || 0;
             const resultsPerPage = response.data.pageInfo?.resultsPerPage || 0;
 
+            // fun-fact google still gives nextPageToken even if there's no message/result 
             if (totalResults === 0 && resultsPerPage === 0) {
                 console.log('No more messages to fetch. Stopping pagination.');
                 break;
@@ -45,18 +47,24 @@ export const fetchLiveChatMessages = async (liveChatId: string): Promise<youtube
             allMessages = allMessages.concat(messages);
             nextPageToken = response.data.nextPageToken || undefined;
 
-            // Add a delay between each page fetch to avoid rate limit
+            // added a little delay because api was giving error that api refresh is not done
             if (nextPageToken) {
                 await delay(delayBetweenPages);
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching live chat messages:', error);
-            await delay(60000); // Wait for 1 minute before retrying in case of error
-            break;
+            if (error.code === 403 && error.errors[0]?.reason === 'quotaExceeded') {
+                console.log('Quota exceeded. Reinitializing YouTube client...');
+                youtube = await initializeYouTubeClient();
+                continue; // fetching messages with new YouTube client next time
+            } else {
+                await delay(60000); // if the code comes to this, then I am praying to god
+                break;
+            }
         }
     } while (nextPageToken);
 
-    console.log('Fetched all messages:', allMessages.length);
+    console.log('Fetched all messages:', allMessages.length); // debug
     return allMessages;
 };

@@ -1,4 +1,4 @@
-// Function to delay execution for a specified number of milliseconds
+// why did I even create this?
 export const delay = (ms: number): Promise<void> => {
     return new Promise(resolve => setTimeout(resolve, ms));
 };

@@ -1,4 +1,4 @@
-// Circular buffer (ring buffer) implementation
+// Circular buffer (ring buffer) implementation for storing new messages and removing old messages
 export class CircularBuffer<T> {
     private buffer: (T | null)[];
     private start: number;
@@ -14,7 +14,7 @@ export class CircularBuffer<T> {
         this.size = 0;
     }
 
-    // Add a message to the buffer if it's new
+    // adding a message to the buffer if it's a new message
     add(message: T): void {
         this.buffer[this.end] = message;
         this.end = (this.end + 1) % this.capacity;
@@ -22,11 +22,12 @@ export class CircularBuffer<T> {
         if (this.size < this.capacity) {
             this.size++;
         } else {
-            this.start = (this.start + 1) % this.capacity; // Overwrite oldest message
+            this.start = (this.start + 1) % this.capacity; // overwriting oldest message if no space
         }
     }
 
-    // Check if the message is a duplicate
+    // function for checking if the message is a duplicate or not
+    // it helps in only storing new messages
     contains(message: T): boolean {
         for (let i = 0; i < this.size; i++) {
             const index = (this.start + i) % this.capacity;
@@ -37,7 +38,6 @@ export class CircularBuffer<T> {
         return false;
     }
 
-    // Retrieve all messages
     getMessages(): T[] {
         const messages: T[] = [];
 
@@ -51,7 +51,7 @@ export class CircularBuffer<T> {
         return messages;
     }
 
-    // Clear the buffer
+    // putting this casually
     clear(): void {
         this.buffer.fill(null);
         this.start = 0;

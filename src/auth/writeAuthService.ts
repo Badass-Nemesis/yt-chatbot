@@ -1,16 +1,12 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-import { config } from 'dotenv';
 import * as fs from 'fs';
 import * as readline from 'readline';
 import * as path from 'path';
 import * as querystring from 'querystring';
 
-config(); // Load environment variables from .env
+const TOKEN_PATH = path.resolve(__dirname, '../writeToken.json');
 
-const TOKEN_PATH = path.resolve(__dirname, '../writeToken.json'); // Adjusted path
-
-// Function to get OAuth2 client for writing
 export const getWriteOAuth2Client = async (): Promise<OAuth2Client> => {
     const oAuth2Client = new google.auth.OAuth2(
         process.env.OAUTH2_CLIENT_ID,
@@ -18,20 +14,18 @@ export const getWriteOAuth2Client = async (): Promise<OAuth2Client> => {
         process.env.OAUTH2_REDIRECT_URI
     );
 
-    // Check if we already have the token stored
     if (fs.existsSync(TOKEN_PATH)) {
         const token = fs.readFileSync(TOKEN_PATH, 'utf8');
         oAuth2Client.setCredentials(JSON.parse(token));
 
-        // Log the loaded tokens to check for refresh token
-        // console.log('Loaded tokens:', JSON.parse(token));
+        // console.log('Loaded tokens:', JSON.parse(token)); // debug
 
-        // Set up token refresh logic
+        // this is token refresh logic code, I don't think it is working though
         oAuth2Client.on('tokens', (newTokens) => {
             if (newTokens.refresh_token) {
                 const updatedTokens = { ...JSON.parse(token), ...newTokens };
                 fs.writeFileSync(TOKEN_PATH, JSON.stringify(updatedTokens));
-                console.log('Token updated and stored to', TOKEN_PATH);
+                console.log('Token updated/refreshed and stored to', TOKEN_PATH); // debug
             }
         });
 
@@ -41,11 +35,11 @@ export const getWriteOAuth2Client = async (): Promise<OAuth2Client> => {
     }
 };
 
-// Function to generate a new token
+// if no writeToken.json is present then get user to login and provide the code
 const getNewToken = (oAuth2Client: OAuth2Client): Promise<OAuth2Client> => {
     const authUrl = oAuth2Client.generateAuthUrl({
-        access_type: 'offline', 
-        prompt: 'consent',
+        access_type: 'offline',
+        prompt: 'consent', // important if I want the refresh token
         scope: ['https://www.googleapis.com/auth/youtube.force-ssl'],
     });
 
@@ -56,11 +50,12 @@ const getNewToken = (oAuth2Client: OAuth2Client): Promise<OAuth2Client> => {
         output: process.stdout,
     });
 
+    // wrapping it up in a promise makes way more sense than making try/catch like a dumb dev I am
     return new Promise((resolve, reject) => {
         rl.question('Enter the code from that page here: ', (code) => {
             rl.close();
-            
-            // Decode the URL-encoded authorization code
+
+            // need this because "%23" means "/" when decoded
             const decodedCode = querystring.unescape(code);
 
             oAuth2Client.getToken(decodedCode, (err, token) => {
@@ -72,12 +67,11 @@ const getNewToken = (oAuth2Client: OAuth2Client): Promise<OAuth2Client> => {
                 // console.log('Generated token:', token); // Log the generated token to verify
 
                 if (token && token.refresh_token) {
-                    oAuth2Client.setCredentials(token as any);
+                    oAuth2Client.setCredentials(token as any); // fuq it, I'm putting "as any"
 
-                    // Store the token to disk for later program executions
                     fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
-                    console.log('Token stored to', TOKEN_PATH);
-                    resolve(oAuth2Client);
+                    console.log('Token stored to', TOKEN_PATH); // debug
+                    resolve(oAuth2Client); 
                 } else {
                     console.error('No refresh token received.');
                     reject('No refresh token received.');
@@ -87,7 +81,7 @@ const getNewToken = (oAuth2Client: OAuth2Client): Promise<OAuth2Client> => {
     });
 };
 
-// Function to setup write authentication and return the client
+// just for safety measures, writing this main code instead of directly using 
 export const setupWriteAuth = async (): Promise<OAuth2Client | null> => {
     try {
         const oAuth2Client = await getWriteOAuth2Client();
