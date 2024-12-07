@@ -15,11 +15,14 @@ interface ApiResponse {
 
 const MAX_REPLY_LENGTH = 200;
 
-export const getReply = async (userName: string, message: string): Promise<string> => {
-    const maxLength = MAX_REPLY_LENGTH - (userName.length + 3);
+export const getReply = async (userName: string, message: string, chatHistory: { name: string; message: string }[]): Promise<string> => {
+    // creating the history string from chatHistory for easy input to the model
+    const historyString = chatHistory.map(item => `User: "${item.name}" said: "${item.message}"`).join("\n");
 
-    // need to remove those double quotes from the final response
-    const prompt = `Keep it within ${maxLength} characters:\nUser: "${message}"\nAI:`;
+    // this format works good enough
+    const prompt = `Here is the memory of our past conversation:\n${historyString}\nNow, please respond 
+    to the user's current message: "${message}"\nRemember to start your reply with @${userName} so the user 
+    is tagged. Do not repeat the user's message. Keep the response within ${MAX_REPLY_LENGTH} characters.`;
 
     try {
         const response = await axios.post<ApiResponse>('http://localhost:11434/api/generate', {
@@ -28,21 +31,14 @@ export const getReply = async (userName: string, message: string): Promise<strin
             stream: false
         });
 
-        // Log the entire response for debugging
         // console.log('API response:', response.data); // debug
 
         if (!response.data || typeof response.data.response !== 'string') {
             throw new Error('Unexpected response format');
         }
 
-        let reply = response.data.response;
-
-        if (reply.length > maxLength) {
-            reply = reply.slice(0, maxLength);
-        }
-
-        // tagging the user in the reply
-        reply = `@${userName} ${reply}`;
+        // removing double quotes from the response given by ollama model
+        let reply = response.data.response.replace(/"/g, '');
 
         return reply;
     } catch (error) {
