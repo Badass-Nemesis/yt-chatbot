@@ -5,7 +5,10 @@ import * as path from 'path';
 
 const loadServiceAccounts = (): string[] => {
     const serviceAccountsDir: string = path.resolve(__dirname, '../serviceAccounts');
-    return fs.readdirSync(serviceAccountsDir).map(file => path.join(serviceAccountsDir, file));
+    const serviceAccountFiles = fs.readdirSync(serviceAccountsDir)
+        .filter(file => /^service-account-\d+\.json$/.test(file)) // filtering out to get only service-account-{number}.json files
+        .map(file => path.join(serviceAccountsDir, file));
+    return serviceAccountFiles;
 };
 
 // getting OAuth2 client for a specific service account json file

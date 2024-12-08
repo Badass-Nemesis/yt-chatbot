@@ -1,4 +1,5 @@
 import express from 'express';
+import { getReply } from './services/ollamaService';
 
 const app = express();
 
